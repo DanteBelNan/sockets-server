@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 import { AuthRequest } from '../types/IAuthRequest';
+import { Socket } from 'socket.io';
 
 
 export const authenticateToken = (
@@ -26,3 +27,20 @@ export const authenticateToken = (
     return res.status(403).json({ message: 'Token inválido o expirado.' });
   }
 };
+
+export const authenticateSocket = (socket: Socket, next: Function) => {
+  const token = socket.handshake.auth.token;
+
+  if(!token){
+    return next(new Error('Authentication error: Token not provided'))
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    socket.data.user = decoded
+    next();
+  }catch(error){
+    return next(new Error('Authentication error: Invalid token'));
+  }
+}

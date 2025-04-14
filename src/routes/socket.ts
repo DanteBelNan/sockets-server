@@ -1,15 +1,22 @@
-import { Server, Socket } from 'socket.io';
+// routes/socket.ts
+import { Server } from 'socket.io';
 import { chatController } from '../controllers/chatController';
 import { privateChatController } from '../controllers/privateChatController';
 import { Request, Response, NextFunction } from 'express';
+import { authenticateSocket } from '../middleware/auth';
+import { AuthenticatedSocket } from '../types/IAuthenticatedSocket';
 
 const socketRouter = (io: Server) => {
   // Chat general (namespace /chat)
   const chatNamespace = io.of('/chat');
+  
+  // Aplicar middleware de autenticación al namespace
+  chatNamespace.use(authenticateSocket);
+  
   let connectedUsers = 0;
   
-  chatNamespace.on('connection', (socket) => {
-    console.log('Un usuario se ha conectado al namespace /chat (socket ID:', socket.id, ')');
+  chatNamespace.on('connection', (socket: AuthenticatedSocket) => {
+    console.log(`Usuario ${socket.data.user.username} conectado al namespace /chat (socket ID: ${socket.id})`);
     connectedUsers++;
     chatController.connectedUsers(chatNamespace, connectedUsers);
     chatController.handleConnection(chatNamespace, socket);
@@ -28,8 +35,11 @@ const socketRouter = (io: Server) => {
   // Chat privado (namespace /privateChat)
   const privateChatNamespace = io.of('/privateChat');
   
-  privateChatNamespace.on('connection', (socket) => {
-    console.log('Un usuario se ha conectado al namespace /privateChat (socket ID:', socket.id, ')');
+  // Aplicar middleware de autenticación al namespace
+  privateChatNamespace.use(authenticateSocket);
+  
+  privateChatNamespace.on('connection', (socket: AuthenticatedSocket) => {
+    console.log(`Usuario ${socket.data.user.username} conectado al namespace /privateChat (socket ID: ${socket.id})`);
     
     // Manejar solicitud de lista de salas
     socket.on('get rooms', () => {
@@ -43,7 +53,7 @@ const socketRouter = (io: Server) => {
 
     socket.on('delete room', (roomId) => {
       privateChatController.handleDeleteRoom(privateChatNamespace, socket, roomId);
-    })
+    });
     
     // Evento para unirse a una sala específica
     socket.on('join room', (roomId) => {
